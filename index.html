@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="theme-color" content="#8B6F47">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Boxy">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Boxy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #7A5C3A;
+            color: #2a2a2a;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        .brick-wall {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: 
+                repeating-linear-gradient(0deg, #8B6F47 0px, #8B6F47 60px, #7A5C3A 60px, #7A5C3A 62px),
+                repeating-linear-gradient(90deg, #A8845C 0px, #A8845C 80px, #8B6F47 80px, #8B6F47 82px, #7A5C3A 82px, #7A5C3A 84px);
+            opacity: 0.95;
+        }
+
+        .brick-wall::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: 
+                repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px),
+                repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 5px),
+                radial-gradient(circle at 20% 50%, rgba(255,255,255,0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0,0,0,0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .container {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .header {
+            padding: 24px 20px 16px;
+            text-align: center;
+            position: relative;
+            z-index: 20;
+            flex: 0 0 auto;
+        }
+
+        .title-tape {
+            display: inline-block;
+            background: linear-gradient(180deg, #FFFAF0 0%, #F5F0E8 50%, #FFFAF0 100%);
+            padding: 8px 24px;
+            border-radius: 4px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(0,0,0,0.1);
+            transform: rotate(-1.5deg);
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #3D2817;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.08);
+            font-family: 'Georgia', serif;
+        }
+
+        .shelves-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 8px 20px;
+            scroll-behavior: smooth;
+            overflow-x: hidden;
+            transition: filter 0.4s ease;
+        }
+
+        .shelves-area.blur {
+            filter: blur(3px) brightness(0.75);
+            pointer-events: none;
+        }
+
+        .shelves-area::-webkit-scrollbar { width: 6px; }
+        .shelves-area::-webkit-scrollbar-track { background: transparent; }
+        .shelves-area::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
+
+        .shelf {
+            margin-bottom: 46px;
+            position: relative;
+        }
+
+        .shelf::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 94%;
+            height: 12px;
+            background: linear-gradient(90deg, #4A3C2A 0%, #5C4A38 20%, #6B5940 50%, #5C4A38 80%, #4A3C2A 100%);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 2px 2px rgba(255,255,255,0.15), inset 0 -2px 2px rgba(0,0,0,0.3);
+        }
+
+        .boxes-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 40px;
+            justify-content: center;
+            padding: 0 14px;
+        }
+
+        /* ===================== CLOSED BOX (shelf view) ===================== */
+
+        .box-3d {
+            width: 90px;
+            height: 80px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            z-index: 15;
+        }
+
+        .box-3d:active {
+            transform: translateY(-3px) scale(0.96);
+        }
+
+        .box-3d.invisible-during-anim {
+            opacity: 0;
+        }
+
+        .box-svg-closed {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .tape-shelf {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-1.5deg);
+            background: linear-gradient(180deg, #F2E4A8 0%, #E3D28E 100%);
+            width: 62px;
+            height: 17px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: 700;
+            color: #5C4A1F;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 6px;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+            z-index: 20;
+            pointer-events: none;
+            clip-path: polygon(
+                6% 0%, 94% 0%,
+                94% 40%, 100% 50%, 94% 60%,
+                94% 100%, 6% 100%,
+                6% 60%, 0% 50%, 6% 40%
+            );
+        }
+
+        .fab {
+            position: fixed;
+            bottom: 24px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #A8845C 0%, #8B6F47 100%);
+            border: 3px solid #6B5940;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: #FFF8E8;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.35), inset 0 1px 2px rgba(255,255,255,0.2);
+            z-index: 100;
+            transition: transform 0.15s ease;
+            touch-action: manipulation;
+        }
+
+        .fab:active { transform: scale(0.9); }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(6px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active { display: flex; }
+
+        .modal-content {
+            background: #F5F0E8;
+            border-radius: 12px;
+            padding: 24px;
+            width: 100%;
+            max-width: 300px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-content h2 { margin-bottom: 16px; font-size: 18px; color: #3D2817; font-weight: 600; }
+
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #D4C4B0;
+            border-radius: 6px;
+            font-size: 15px;
+            margin-bottom: 16px;
+            background: white;
+            color: #2a2a2a;
+            font-family: inherit;
+        }
+
+        .modal-content input::placeholder { color: #9A8F7E; }
+        .modal-buttons { display: flex; gap: 12px; }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+            touch-action: manipulation;
+        }
+
+        .btn-primary { background: #8B6F47; color: white; box-shadow: 0 3px 8px rgba(0,0,0,0.2); }
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-secondary { background: #E8DCC8; color: #3D2817; border: 1px solid #D4C4B0; }
+        .btn-secondary:active { transform: scale(0.96); }
+
+        /* ===================== BOX OPEN OVERLAY ===================== */
+
+        .papers-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 500;
+        }
+
+        .papers-overlay.active { display: block; }
+
+        .overlay-dim {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0);
+            transition: background 0.4s ease;
+        }
+
+        .papers-overlay.show-ui .overlay-dim {
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(3px);
+        }
+
+        .papers-overlay-header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            z-index: 30;
+            opacity: 0;
+            transition: opacity 0.3s ease 0.25s;
+        }
+
+        .papers-overlay.show-ui .papers-overlay-header { opacity: 1; }
+
+        .close-papers {
+            background: rgba(0,0,0,0.3);
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: white;
+            padding: 0;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+        }
+
+        /* The box that travels from shelf position to bottom of screen */
+        .open-box-anchor {
+            position: fixed;
+            width: 90px;
+            height: 80px;
+            z-index: 5;
+            transition: left 0.5s cubic-bezier(0.4,0,0.2,1), top 0.5s cubic-bezier(0.4,0,0.2,1), width 0.5s cubic-bezier(0.4,0,0.2,1), height 0.5s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        .open-box-anchor svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            position: absolute;
+            top: 0; left: 0;
+        }
+
+        .anchor-tape {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-1.5deg);
+            background: linear-gradient(180deg, #F2E4A8 0%, #E3D28E 100%);
+            width: 62px;
+            height: 17px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: 700;
+            color: #5C4A1F;
+            white-space: nowrap;
+            overflow: hidden;
+            padding: 0 6px;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+            z-index: 20;
+            pointer-events: none;
+            clip-path: polygon(
+                6% 0%, 94% 0%,
+                94% 40%, 100% 50%, 94% 60%,
+                94% 100%, 6% 100%,
+                6% 60%, 0% 50%, 6% 40%
+            );
+            transition: top 0.5s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        .papers-stack {
+            position: fixed;
+            left: 50%;
+            width: 220px;
+            height: 260px;
+            opacity: 0;
+            transition: opacity 0.3s ease 0.25s;
+            z-index: 8;
+            pointer-events: none;
+            transform: translateX(-50%);
+        }
+
+        .papers-overlay.show-ui .papers-stack {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .paper {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 200px;
+            height: 230px;
+            background: repeating-linear-gradient(180deg, #FEFDF9 0px, #FEFDF9 14px, #E8E3D3 14px, #E8E3D3 14.5px);
+            border: 1px solid #D4C8B8;
+            border-radius: 2px;
+            padding: 14px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.35), inset 0 1px 1px rgba(255,255,255,0.4);
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            overflow: hidden;
+            transition: transform 0.28s cubic-bezier(0.3, 0.3, 0.2, 1), opacity 0.28s ease;
+        }
+
+        .paper.dragging { transition: none; cursor: grabbing; }
+
+        .paper-content a { touch-action: auto; }
+
+        .paper-content {
+            width: 100%;
+            height: 100%;
+            font-size: 11px;
+            color: #3D2817;
+            line-height: 14px;
+            word-wrap: break-word;
+            overflow: hidden;
+            text-align: left;
+            white-space: pre-wrap;
+        }
+
+        .empty-papers-msg {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.5);
+            font-size: 13px;
+            opacity: 0;
+            transition: opacity 0.3s ease 0.3s;
+            white-space: nowrap;
+            z-index: 6;
+        }
+
+        .papers-overlay.show-ui .empty-papers-msg { opacity: 1; }
+
+        .paper-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(6px);
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .paper-modal.active { display: flex; }
+
+        .paper-form {
+            background: #F5F0E8;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 320px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        .paper-form h3 { margin-bottom: 16px; font-size: 18px; color: #3D2817; font-weight: 600; }
+
+        .paper-form textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #D4C4B0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            margin-bottom: 16px;
+            resize: vertical;
+            min-height: 100px;
+            background: white;
+            color: #2a2a2a;
+        }
+
+        .paper-form textarea::placeholder { color: #9A8F7E; }
+
+        .fab-add-paper {
+            position: fixed;
+            bottom: 24px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #A8845C 0%, #8B6F47 100%);
+            border: 3px solid #6B5940;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: #FFF8E8;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+            z-index: 60;
+            opacity: 0;
+            transition: opacity 0.3s ease 0.3s, transform 0.15s ease;
+            touch-action: manipulation;
+        }
+
+        .papers-overlay.show-ui .fab-add-paper { opacity: 1; }
+        .fab-add-paper:active { transform: scale(0.9); }
+
+        /* ===================== SPLASH SCREEN ===================== */
+
+        .splash {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #7A5C3A;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: opacity 0.5s ease;
+        }
+
+        .splash.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .splash-stage {
+            position: relative;
+            width: 140px;
+            height: 140px;
+        }
+
+        .splash-box {
+            position: absolute;
+            width: 100px;
+            height: 88px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+        }
+
+        .splash-box svg { width: 100%; height: 100%; display: block; }
+
+        .splash-paper {
+            position: absolute;
+            width: 34px;
+            height: 42px;
+            left: 50%;
+            top: 50%;
+            background: repeating-linear-gradient(180deg, #FEFDF9 0px, #FEFDF9 5px, #E8E3D3 5px, #E8E3D3 5.3px);
+            border: 1px solid #D4C8B8;
+            border-radius: 1px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            opacity: 0;
+            z-index: 3;
+            transform: translate(-50%, -50%) scale(0.5);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+        }
+
+        .splash-title {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.7);
+            opacity: 0;
+            transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 10000;
+        }
+
+        .splash-title.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .splash-title .title-tape {
+            font-size: 48px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="splash" id="splash">
+        <div class="splash-stage" id="splashStage">
+            <div class="splash-box" id="splashBox"></div>
+        </div>
+    </div>
+    <div class="splash-title" id="splashTitle">
+        <div class="title-tape">Boxy</div>
+    </div>
+
+    <div class="brick-wall"></div>
+
+    <div class="container">
+        <div class="header">
+            <div class="title-tape">Boxy</div>
+        </div>
+        <div class="shelves-area" id="shelvesArea"></div>
+    </div>
+
+    <div class="papers-overlay" id="papersOverlay">
+        <div class="overlay-dim"></div>
+        
+        <div class="open-box-anchor" id="openBoxAnchor"></div>
+
+        <div class="papers-stack" id="papersStack"></div>
+        <div class="empty-papers-msg" id="emptyPapersMsg">Nenhum papel ainda</div>
+
+        <div class="fab-add-paper" onclick="showPaperModal()">+</div>
+    </div>
+
+    <div class="fab" onclick="showNameModal()">+</div>
+
+    <div class="modal" id="nameModal">
+        <div class="modal-content">
+            <h2>Nova Caixa</h2>
+            <input type="text" id="boxNameInput" placeholder="Nome da caixa..." maxlength="30">
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="cancelBoxCreation()">Cancelar</button>
+                <button class="btn btn-primary" onclick="createBox()">Criar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="paper-modal" id="paperModal">
+        <div class="paper-form">
+            <h3>Novo Papel</h3>
+            <textarea id="paperContent" placeholder="Escreva algo..."></textarea>
+            <div id="imagePreviewWrap" style="display:none; margin-bottom:16px;">
+                <img id="imagePreview" style="width:100%; border-radius:6px; display:block; border:1px solid #D4C4B0;">
+                <button type="button" onclick="removeAttachment()" style="margin-top:8px; background:none; border:none; color:#B0503C; font-size:12px; font-weight:600; cursor:pointer; padding:0;">Remover</button>
+            </div>
+            <div id="filePreviewWrap" style="display:none; margin-bottom:16px; background:white; border:1px solid #D4C4B0; border-radius:6px; padding:10px; display:none; align-items:center; gap:10px;">
+                <div style="font-size:24px;">📎</div>
+                <div style="flex:1; min-width:0;">
+                    <div id="fileNamePreview" style="font-size:13px; font-weight:600; color:#3D2817; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+                    <div id="fileSizePreview" style="font-size:11px; color:#9A8F7E;"></div>
+                </div>
+                <button type="button" onclick="removeAttachment()" style="background:none; border:none; color:#B0503C; font-size:12px; font-weight:600; cursor:pointer; flex:0 0 auto;">Remover</button>
+            </div>
+            <input type="file" id="fileInput" style="display:none;" onchange="handleFileSelect(event)">
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="triggerFilePick()" style="flex: 0 0 auto; padding: 12px 16px;">📎</button>
+                <button class="btn btn-secondary" onclick="cancelPaper()">Cancelar</button>
+                <button class="btn btn-primary" onclick="savePaper()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let boxes = [];
+        let currentBoxId = null;
+        let paperOrder = [];
+        let isClosed = true; // tracks visual state of the traveling box (closed vs open flaps)
+
+        // ============ SVG: single box, two states via a "lid" group we rotate ============
+        // Simpler & robust: box body is identical in both states; only the top lid flaps differ.
+        function svgBox(idSuffix, open) {
+            if (!open) {
+                // CLOSED: flat pixelated-outline box, front view, small top strip
+                return `
+                <svg viewBox="0 0 100 88" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+                    <defs>
+                        <linearGradient id="cf${idSuffix}" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#C9A876"/>
+                            <stop offset="100%" stop-color="#A9835A"/>
+                        </linearGradient>
+                        <linearGradient id="ct${idSuffix}" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#DDBE8E"/>
+                            <stop offset="100%" stop-color="#C9A876"/>
+                        </linearGradient>
+                        <linearGradient id="cs${idSuffix}" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="#8A6B45"/>
+                            <stop offset="100%" stop-color="#6E5535"/>
+                        </linearGradient>
+                    </defs>
+                    <g fill="#4A3520">
+                        <rect x="10" y="14" width="72" height="4"/>
+                        <rect x="6" y="18" width="4" height="4"/>
+                        <rect x="82" y="18" width="4" height="4"/>
+                        <rect x="6" y="22" width="80" height="4"/>
+                        <rect x="6" y="26" width="4" height="54"/>
+                        <rect x="82" y="26" width="4" height="54"/>
+                        <rect x="10" y="80" width="72" height="4"/>
+                    </g>
+                    <rect x="10" y="18" width="72" height="8" fill="url(#ct${idSuffix})"/>
+                    <rect x="10" y="26" width="56" height="54" fill="url(#cf${idSuffix})"/>
+                    <rect x="66" y="26" width="16" height="54" fill="url(#cs${idSuffix})"/>
+                    <rect x="65" y="26" width="2" height="54" fill="#5C4530" opacity="0.4"/>
+                </svg>`;
+            } else {
+                // OPEN: same body proportions, but top has 2 flaps splayed outward (simple, not 5 pieces)
+                return `
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+                    <defs>
+                        <linearGradient id="of${idSuffix}" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#C9A876"/>
+                            <stop offset="100%" stop-color="#A9835A"/>
+                        </linearGradient>
+                        <linearGradient id="os${idSuffix}" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="#8A6B45"/>
+                            <stop offset="100%" stop-color="#6E5535"/>
+                        </linearGradient>
+                        <linearGradient id="ofl${idSuffix}" x1="0" y1="1" x2="0" y2="0">
+                            <stop offset="0%" stop-color="#DDBE8E"/>
+                            <stop offset="100%" stop-color="#C9A876"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- box body (lower part, same as closed but shifted down) -->
+                    <g fill="#4A3520">
+                        <rect x="6" y="34" width="4" height="54"/>
+                        <rect x="82" y="34" width="4" height="54"/>
+                        <rect x="10" y="88" width="72" height="4"/>
+                        <rect x="6" y="30" width="80" height="4"/>
+                    </g>
+                    <rect x="10" y="34" width="56" height="54" fill="url(#of${idSuffix})"/>
+                    <rect x="66" y="34" width="16" height="54" fill="url(#os${idSuffix})"/>
+                    <rect x="65" y="34" width="2" height="54" fill="#5C4530" opacity="0.4"/>
+                    <!-- inside shadow -->
+                    <rect x="10" y="30" width="72" height="6" fill="#2E2115"/>
+                    <!-- left flap open (tilted back-left) -->
+                    <polygon points="8,32 46,32 40,6 14,10" fill="url(#ofl${idSuffix})" stroke="#4A3520" stroke-width="3" stroke-linejoin="round"/>
+                    <!-- right flap open (tilted back-right) -->
+                    <polygon points="50,32 88,32 82,10 56,6" fill="url(#of${idSuffix})" stroke="#4A3520" stroke-width="3" stroke-linejoin="round"/>
+                </svg>`;
+            }
+        }
+
+        window.addEventListener('load', () => {
+            loadData();
+            render();
+            runSplashSequence();
+        });
+
+        function runSplashSequence() {
+            const splashBox = document.getElementById('splashBox');
+            const stage = document.getElementById('splashStage');
+            const splash = document.getElementById('splash');
+            const splashTitle = document.getElementById('splashTitle');
+
+            const NUM_PAPERS = 5;
+            const paperEls = [];
+
+            // Timeline (ms) — generous padding so every step is visible and unhurried.
+            const T = {
+                start: 0,
+                openStart: 200,
+                popStart: 500,      // papers start popping out, staggered
+                popStagger: 250,
+                popDuration: 550,
+                holdStart: 2600,    // brief pause with papers scattered
+                holdDuration: 500,
+                returnStart: 3200,  // papers start returning one by one
+                returnStagger: 260,
+                returnDuration: 500,
+                closeStart: 5100,   // box closes
+                closeDuration: 400,
+                titleStart: 5500,
+                titleDuration: 400,
+                end: 7500
+            };
+
+            splashBox.innerHTML = svgBox('splashClosed', false);
+
+            // Pre-create paper elements, scattered target positions
+            const scatterPositions = [
+                { x: -55, y: -70, rot: -18 },
+                { x: 50, y: -75, rot: 14 },
+                { x: -65, y: 10, rot: -8 },
+                { x: 60, y: 15, rot: 10 },
+                { x: 0, y: -95, rot: 3 }
+            ];
+
+            for (let i = 0; i < NUM_PAPERS; i++) {
+                const p = document.createElement('div');
+                p.className = 'splash-paper';
+                stage.appendChild(p);
+                paperEls.push(p);
+            }
+
+            // Open the box (swap to open-flap art)
+            setTimeout(() => {
+                splashBox.innerHTML = svgBox('splashOpen', true);
+            }, T.openStart);
+
+            // Pop papers out, staggered
+            paperEls.forEach((p, i) => {
+                const pos = scatterPositions[i];
+                setTimeout(() => {
+                    p.style.opacity = '1';
+                    p.style.transform = `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) scale(1) rotate(${pos.rot}deg)`;
+                }, T.popStart + i * T.popStagger);
+            });
+
+            // Return papers, one by one, back into the box (reverse order looks natural)
+            const reversedIdx = [...paperEls.keys()].reverse();
+            reversedIdx.forEach((idx, order) => {
+                const p = paperEls[idx];
+                setTimeout(() => {
+                    p.style.transition = 'transform 0.4s cubic-bezier(0.5,0,0.3,1), opacity 0.4s ease';
+                    p.style.transform = 'translate(-50%, -50%) scale(0.3)';
+                    p.style.opacity = '0';
+                }, T.returnStart + order * T.returnStagger);
+            });
+
+            // Close the box
+            setTimeout(() => {
+                splashBox.innerHTML = svgBox('splashClosed2', false);
+            }, T.closeStart);
+
+            // Show title
+            setTimeout(() => {
+                splashTitle.classList.add('show');
+            }, T.titleStart);
+
+            // Fade out splash, reveal app underneath
+            setTimeout(() => {
+                splash.classList.add('fade-out');
+                splashTitle.style.transition = 'opacity 0.4s ease';
+                splashTitle.style.opacity = '0';
+                setTimeout(() => {
+                    splash.remove();
+                    splashTitle.remove();
+                }, 500);
+            }, T.end);
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('boxy-boxes');
+            boxes = saved ? JSON.parse(saved) : [];
+        }
+
+        function saveData() {
+            localStorage.setItem('boxy-boxes', JSON.stringify(boxes));
+        }
+
+        function render() {
+            const area = document.getElementById('shelvesArea');
+            area.innerHTML = '';
+
+            if (boxes.length === 0) {
+                area.innerHTML = '<div style="text-align: center; padding-top: 40px; color: rgba(255,255,255,0.4); font-size: 14px;">Toque no + para criar a primeira caixa</div>';
+                return;
+            }
+
+            const shelvesCount = Math.ceil(boxes.length / 3);
+            for (let s = 0; s < shelvesCount; s++) {
+                const shelf = document.createElement('div');
+                shelf.className = 'shelf';
+                const row = document.createElement('div');
+                row.className = 'boxes-row';
+
+                const boxesInShelf = boxes.slice(s * 3, s * 3 + 3);
+                boxesInShelf.forEach(box => {
+                    const boxEl = createBoxElement(box);
+                    row.appendChild(boxEl);
+                });
+
+                shelf.appendChild(row);
+                area.appendChild(shelf);
+            }
+        }
+
+        function createBoxElement(box) {
+            const div = document.createElement('div');
+            div.className = 'box-3d';
+            div.id = 'box-' + box.id;
+            div.innerHTML = `
+                ${svgBox('shelf' + box.id, false)}
+                <div class="tape-shelf">${escapeHtml(box.name)}</div>
+            `;
+            div.querySelector('svg').classList.add('box-svg-closed');
+            div.onclick = () => openBox(box.id, div);
+            return div;
+        }
+
+        function escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        function renderAttachmentHtml(attachment, content) {
+            if (!attachment) return '';
+
+            if (attachment.type === 'image') {
+                return `<img src="${attachment.data}" style="width:100%; ${content ? 'max-height:55%;' : 'height:100%;'} object-fit:cover; border-radius:2px; margin-bottom:${content ? '8px' : '0'}; display:block;">`;
+            }
+
+            // Generic file: show a small card with icon, name, size, and a tap-to-open link.
+            const icon = fileIconFor(attachment.mime, attachment.name);
+            return `
+                <a href="${attachment.data}" download="${escapeHtml(attachment.name)}" style="display:flex; align-items:center; gap:8px; background:#F5F0E8; border:1px solid #D4C8B8; border-radius:4px; padding:8px; margin-bottom:${content ? '8px' : '0'}; text-decoration:none; pointer-events:auto;">
+                    <div style="font-size:20px; flex:0 0 auto;">${icon}</div>
+                    <div style="min-width:0; flex:1;">
+                        <div style="font-size:10px; font-weight:700; color:#3D2817; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(attachment.name)}</div>
+                        <div style="font-size:9px; color:#9A8F7E;">${formatFileSize(attachment.size)} · toque para abrir</div>
+                    </div>
+                </a>`;
+        }
+
+        function fileIconFor(mime, name) {
+            const ext = (name.split('.').pop() || '').toLowerCase();
+            if (mime.startsWith('video/')) return '🎬';
+            if (mime.startsWith('audio/')) return '🎵';
+            if (mime === 'application/pdf' || ext === 'pdf') return '📄';
+            if (ext === 'zip' || ext === 'rar' || ext === '7z') return '🗜️';
+            if (['html', 'htm'].includes(ext)) return '🌐';
+            if (['doc', 'docx'].includes(ext)) return '📝';
+            if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
+            if (['ppt', 'pptx'].includes(ext)) return '📊';
+            return '📎';
+        }
+
+        function showNameModal() {
+            document.getElementById('nameModal').classList.add('active');
+            setTimeout(() => document.getElementById('boxNameInput').focus(), 100);
+            document.getElementById('boxNameInput').value = '';
+        }
+
+        function cancelBoxCreation() {
+            document.getElementById('nameModal').classList.remove('active');
+        }
+
+        function createBox() {
+            const name = document.getElementById('boxNameInput').value.trim();
+            if (!name) { alert('Digite um nome'); return; }
+            boxes.push({ id: Date.now(), name: name, papers: [] });
+            saveData();
+            cancelBoxCreation();
+            render();
+        }
+
+        function openBox(boxId, boxEl) {
+            currentBoxId = boxId;
+            const box = boxes.find(b => b.id === boxId);
+
+            paperOrder = box.papers.map(p => p.id);
+
+            const rect = boxEl.getBoundingClientRect();
+            const anchor = document.getElementById('openBoxAnchor');
+
+            anchor.innerHTML = svgBox('anim' + boxId, false) + `<div class="anchor-tape">${escapeHtml(box.name)}</div>`;
+            isClosed = true;
+
+            anchor.style.transition = 'none';
+            anchor.style.left = rect.left + 'px';
+            anchor.style.top = rect.top + 'px';
+            anchor.style.width = rect.width + 'px';
+            anchor.style.height = rect.height + 'px';
+
+            boxEl.classList.add('invisible-during-anim');
+
+            const overlay = document.getElementById('papersOverlay');
+            overlay.classList.add('active');
+
+            requestAnimationFrame(() => {
+                anchor.getBoundingClientRect(); // reflow
+                anchor.style.transition = 'left 0.5s cubic-bezier(0.4,0,0.2,1), top 0.5s cubic-bezier(0.4,0,0.2,1), width 0.5s cubic-bezier(0.4,0,0.2,1), height 0.5s cubic-bezier(0.4,0,0.2,1)';
+
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                const finalWidth = Math.min(vw * 0.55, 190);
+                const finalHeight = finalWidth * (88/100);
+                const finalLeft = (vw - finalWidth) / 2;
+                const finalTop = vh - finalHeight * 0.65;
+
+                anchor.style.left = finalLeft + 'px';
+                anchor.style.top = finalTop + 'px';
+                anchor.style.width = finalWidth + 'px';
+                anchor.style.height = finalHeight + 'px';
+
+                const stack = document.getElementById('papersStack');
+                stack.style.bottom = (vh - finalTop - finalHeight * 0.3) + 'px';
+
+                const emptyMsg = document.getElementById('emptyPapersMsg');
+                emptyMsg.style.bottom = (vh - finalTop) + 'px';
+
+                overlay.classList.add('show-ui');
+
+                // swap to open-flaps art once box arrives near destination
+                setTimeout(() => {
+                    if (isClosed) {
+                        anchor.innerHTML = svgBox('anim' + boxId + 'open', true) + `<div class="anchor-tape">${escapeHtml(box.name)}</div>`;
+                        isClosed = false;
+                    }
+                }, 480);
+
+                renderPapers();
+            });
+        }
+
+        function closePapers() {
+            const overlay = document.getElementById('papersOverlay');
+            const anchor = document.getElementById('openBoxAnchor');
+            const boxEl = document.getElementById('box-' + currentBoxId);
+            const box = boxes.find(b => b.id === currentBoxId);
+
+            // swap back to closed art immediately
+            if (box) {
+                anchor.innerHTML = svgBox('closing' + currentBoxId, false) + `<div class="anchor-tape">${escapeHtml(box.name)}</div>`;
+                isClosed = true;
+            }
+
+            overlay.classList.remove('show-ui');
+
+            if (boxEl) {
+                const rect = boxEl.getBoundingClientRect();
+                anchor.style.left = rect.left + 'px';
+                anchor.style.top = rect.top + 'px';
+                anchor.style.width = rect.width + 'px';
+                anchor.style.height = rect.height + 'px';
+            }
+
+            setTimeout(() => {
+                overlay.classList.remove('active');
+                if (boxEl) boxEl.classList.remove('invisible-during-anim');
+                currentBoxId = null;
+            }, 500);
+        }
+
+        function renderPapers() {
+            const box = boxes.find(b => b.id === currentBoxId);
+            if (!box) return;
+            const stack = document.getElementById('papersStack');
+            const emptyMsg = document.getElementById('emptyPapersMsg');
+            stack.innerHTML = '';
+
+            if (!box.papers.length) {
+                emptyMsg.style.display = 'block';
+                return;
+            }
+            emptyMsg.style.display = 'none';
+
+            const orderedPapers = paperOrder
+                .map(id => box.papers.find(p => p.id === id))
+                .filter(Boolean);
+
+            const total = orderedPapers.length;
+
+            for (let i = total - 1; i >= 0; i--) {
+                const paper = orderedPapers[i];
+                const paperEl = document.createElement('div');
+                paperEl.className = 'paper';
+                paperEl.dataset.paperId = paper.id;
+
+                const depth = i;
+                const offsetY = Math.min(depth * 6, 24);
+                const offsetX = Math.min(depth * 3, 12);
+                const scale = Math.max(1 - depth * 0.02, 0.9);
+                const rotate = depth === 0 ? 0 : (depth % 2 === 0 ? 1.5 : -1.5) * Math.min(depth, 3);
+
+                paperEl.style.zIndex = 100 - depth;
+                paperEl.style.transform = `translateX(calc(-50% + ${offsetX}px)) translateY(-${offsetY}px) scale(${scale}) rotate(${rotate}deg)`;
+                paperEl.style.opacity = Math.max(1 - depth * 0.12, 0.35);
+
+                const content = (paper.text || '').substring(0, 900);
+                const attachmentHtml = renderAttachmentHtml(paper.attachment, content);
+                paperEl.innerHTML = `<div class="paper-content">${attachmentHtml}${escapeHtml(content)}</div>`;
+
+                if (depth === 0) {
+                    attachDrag(paperEl, paper.id);
+                }
+
+                stack.appendChild(paperEl);
+            }
+        }
+
+        function attachDrag(el, paperId) {
+            let startY = 0;
+            let startX = 0;
+            let curX = 0;
+            let curY = 0;
+            let dragging = false;
+
+            function onStart(x, y) {
+                startY = y;
+                startX = x;
+                curX = 0;
+                curY = 0;
+                dragging = true;
+                el.classList.add('dragging');
+            }
+
+            function onMove(x, y) {
+                if (!dragging) return;
+                curY = y - startY;
+                curX = x - startX;
+                el.style.transform = `translateX(calc(-50% + ${curX * 0.3}px)) translateY(${curY}px) scale(${1 - Math.min(Math.abs(curY) / 800, 0.15)}) rotate(${curX * 0.05}deg)`;
+                el.style.opacity = Math.max(1 - Math.abs(curY) / 400, 0.25);
+            }
+
+            function onEnd() {
+                if (!dragging) return;
+                dragging = false;
+                el.classList.remove('dragging');
+
+                const upThreshold = -70;
+                const downThreshold = 70;
+
+                if (curY < upThreshold) {
+                    sendToBack(paperId);
+                } else if (curY > downThreshold) {
+                    putAwayAllAndClose();
+                } else {
+                    renderPapers();
+                }
+            }
+
+            el.addEventListener('touchstart', (e) => {
+                if (e.touches.length !== 1) return;
+                if (e.target.closest('a')) return; // let file-attachment links open normally
+                onStart(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+
+            el.addEventListener('touchmove', (e) => {
+                if (!dragging) return;
+                onMove(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+
+            el.addEventListener('touchend', onEnd);
+            el.addEventListener('touchcancel', onEnd);
+
+            el.addEventListener('mousedown', (e) => {
+                if (e.target.closest('a')) return; // let file-attachment links open normally
+                e.preventDefault();
+                onStart(e.clientX, e.clientY);
+                const mm = (ev) => onMove(ev.clientX, ev.clientY);
+                const mu = () => {
+                    onEnd();
+                    document.removeEventListener('mousemove', mm);
+                    document.removeEventListener('mouseup', mu);
+                };
+                document.addEventListener('mousemove', mm);
+                document.addEventListener('mouseup', mu);
+            });
+        }
+
+        function sendToBack(paperId) {
+            const idx = paperOrder.indexOf(paperId);
+            if (idx === -1) return;
+            paperOrder.splice(idx, 1);
+            paperOrder.push(paperId);
+            renderPapers();
+        }
+
+        // Dragging any paper down far enough puts everything away and closes the box.
+        function putAwayAllAndClose() {
+            const stack = document.getElementById('papersStack');
+            const paperEls = stack.querySelectorAll('.paper');
+            paperEls.forEach((el, i) => {
+                el.style.transition = `transform 0.35s cubic-bezier(0.5,0,0.3,1) ${i * 20}ms, opacity 0.35s ease ${i * 20}ms`;
+                el.style.transform = `translateX(-50%) translateY(260px) scale(0.4)`;
+                el.style.opacity = '0';
+            });
+
+            saveData();
+            setTimeout(() => closePapers(), 320);
+        }
+
+        let pendingAttachment = null; // { type: 'image'|'file', data: base64String, name, size, mime }
+
+        function showPaperModal() {
+            document.getElementById('paperModal').classList.add('active');
+            setTimeout(() => document.getElementById('paperContent').focus(), 100);
+            document.getElementById('paperContent').value = '';
+            removeAttachment();
+        }
+
+        function cancelPaper() {
+            document.getElementById('paperModal').classList.remove('active');
+            removeAttachment();
+        }
+
+        function triggerFilePick() {
+            document.getElementById('fileInput').click();
+        }
+
+        // Rough estimate of localStorage usage vs typical 5MB browser quota.
+        function getStoragePercentUsed() {
+            let total = 0;
+            for (let key in localStorage) {
+                if (localStorage.hasOwnProperty(key)) {
+                    total += (localStorage[key].length + key.length) * 2; // UTF-16 chars ~2 bytes
+                }
+            }
+            const assumedQuota = 5 * 1024 * 1024; // 5MB, conservative typical mobile browser limit
+            return (total / assumedQuota) * 100;
+        }
+
+        function warnIfStorageNearFull() {
+            const pct = getStoragePercentUsed();
+            if (pct >= 80) {
+                alert('Atenção: o armazenamento do Boxy está a ' + Math.round(pct) + '% da capacidade. Arquivos grandes podem não caber em breve.');
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            warnIfStorageNearFull();
+
+            const isImage = file.type.startsWith('image/');
+
+            if (isImage) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const maxDim = 900;
+                        let { width, height } = img;
+                        if (width > maxDim || height > maxDim) {
+                            const scale = maxDim / Math.max(width, height);
+                            width = Math.round(width * scale);
+                            height = Math.round(height * scale);
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+                        pendingAttachment = { type: 'image', data: dataUrl, name: file.name, size: dataUrl.length, mime: 'image/jpeg' };
+
+                        document.getElementById('imagePreview').src = dataUrl;
+                        document.getElementById('imagePreviewWrap').style.display = 'block';
+                        document.getElementById('filePreviewWrap').style.display = 'none';
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const dataUrl = e.target.result;
+                    pendingAttachment = { type: 'file', data: dataUrl, name: file.name, size: file.size, mime: file.type || 'application/octet-stream' };
+
+                    document.getElementById('fileNamePreview').textContent = file.name;
+                    document.getElementById('fileSizePreview').textContent = formatFileSize(file.size);
+                    document.getElementById('filePreviewWrap').style.display = 'flex';
+                    document.getElementById('imagePreviewWrap').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+
+            event.target.value = ''; // allow picking the same file again later
+        }
+
+        function removeAttachment() {
+            pendingAttachment = null;
+            document.getElementById('imagePreviewWrap').style.display = 'none';
+            document.getElementById('imagePreview').src = '';
+            document.getElementById('filePreviewWrap').style.display = 'none';
+        }
+
+        function savePaper() {
+            const text = document.getElementById('paperContent').value.trim();
+            if (!text && !pendingAttachment) { alert('Escreva algo ou anexe um arquivo'); return; }
+            const box = boxes.find(b => b.id === currentBoxId);
+            const newPaper = { id: Date.now(), text: text, attachment: pendingAttachment };
+            box.papers.push(newPaper);
+            paperOrder.unshift(newPaper.id);
+
+            try {
+                saveData();
+            } catch (e) {
+                alert('Não foi possível salvar — o armazenamento local está cheio. Tente um arquivo menor ou remova papéis antigos.');
+                box.papers.pop();
+                paperOrder.shift();
+                return;
+            }
+
+            cancelPaper();
+            renderPapers();
+        }
+
+        document.getElementById('boxNameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') createBox();
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {
+                    // Offline caching is a bonus feature; ignore failures silently
+                    // (e.g. running from file:// where service workers aren't allowed).
+                });
+            });
+        }
+    </script>
+</body>
+</html>
